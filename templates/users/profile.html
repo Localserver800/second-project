@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}User Profile - Roadside Rescue{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="h3 mb-2">User Profile</h1>
+    <p class="text-muted">Here is your profile information.</p>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">{{ user.username }}</h5>
+            <p class="card-text"><strong>Email:</strong> {{ user.email }}</p>
+            <p class="card-text"><strong>User Type:</strong> {{ user.get_user_type_display }}</p>
+            <p class="card-text"><strong>Phone Number:</strong> {{ user.phone_number }}</p>
+            <p class="card-text"><strong>Address:</strong> {{ user.address }}</p>
+
+            {% if user.user_type == 'driver' %}
+            <hr>
+            <h5 class="card-title">Driver Information</h5>
+            <p class="card-text"><strong>Vehicle Type:</strong> {{ user.driver.vehicle_type }}</p>
+            <p class="card-text"><strong>License Plate:</strong> {{ user.driver.license_plate }}</p>
+            {% elif user.user_type == 'provider' %}
+            <hr>
+            <h5 class="card-title">Service Provider Information</h5>
+            <p class="card-text"><strong>Company Name:</strong> {{ user.serviceprovider.company_name }}</p>
+            <p class="card-text"><strong>Services:</strong>
+                {% for service in user.serviceprovider.services.all %}
+                    {{ service.name }}{% if not forloop.last %}, {% endif %}
+                {% empty %}
+                    No services offered
+                {% endfor %}
+            </p>
+            <p class="card-text"><strong>Rating:</strong> {{ user.serviceprovider.rating }}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

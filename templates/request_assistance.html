@@ -1,0 +1,366 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Request Assistance - Roadside Rescue{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Map Section -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0" style="color: #1e3a8a;">
+                        <i class="fas fa-map-marked-alt me-2"></i>Select Your Location
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Leaflet CSS -->
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+                    <div id="requestMap" style="height: 500px;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Request Form -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0" style="color: #1e3a8a;">
+                        <i class="fas fa-tools me-2"></i>Service Details
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="assistanceForm">
+                        {% csrf_token %}
+                        
+                        <!-- Service Type -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">What type of help do you need?</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="service_type" id="towing" value="towing" checked>
+                                    <label class="btn btn-outline-primary w-100" for="towing">
+                                        <i class="fas fa-truck me-2"></i>Towing
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="service_type" id="mechanic" value="mechanic">
+                                    <label class="btn btn-outline-primary w-100" for="mechanic">
+                                        <i class="fas fa-tools me-2"></i>Mechanic
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="service_type" id="vulcanizing" value="vulcanizing">
+                                    <label class="btn btn-outline-primary w-100" for="vulcanizing">
+                                        <i class="fas fa-tire me-2"></i>Vulcanizing
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="service_type" id="parts" value="parts">
+                                    <label class="btn btn-outline-primary w-100" for="parts">
+                                        <i class="fas fa-cog me-2"></i>Parts
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Vehicle Information -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Vehicle Details</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control" placeholder="Vehicle Type" value="{{ user.driver.vehicle_type }}" readonly>
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control" placeholder="License Plate" value="{{ user.driver.license_plate }}" readonly>
+                                 </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Problem Description -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Describe the Problem</label>
+                            <textarea class="form-control" name="description" rows="4" placeholder="Please describe what happened and what help you need..."></textarea>
+                        </div>
+                        
+                        <!-- Location Details -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Current Location</label>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
+                                <input type="text" class="form-control" id="currentAddressInput" readonly>
+                            </div>
+                            <label class="form-label fw-bold">Additional Location Details</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-info-circle"></i></span>
+                                <input type="text" class="form-control" id="locationDetails" name="location_details" placeholder="Landmark, building name, etc.">
+                            </div>
+                            <small class="text-muted">Drag the marker on the map to adjust your location.</small>
+                        </div>
+                        
+                        <!-- Emergency Contact -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Emergency Contact</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                <input type="text" class="form-control" value="{{ user.phone_number }}" readonly>
+                            </div>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="submitRequest">
+                            <i class="fas fa-paper-plane me-2"></i>Request Assistance
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Nearby Providers Preview -->
+            <div class="card mt-3">
+                <div class="card-header bg-white">
+                    <h6 class="card-title mb-0" style="color: #1e3a8a;">
+                        <i class="fas fa-users me-2"></i>Available Help Nearby
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="nearbyProvidersPreview" class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Finding available providers...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // Map and location variables
+    let requestMap;
+    let locationMarker;
+    let currentLocation = {
+        lat: {{ default_lat }},
+        lon: {{ default_lon }}
+    };
+    
+    // Initialize request map
+    function initRequestMap() {
+        console.log('initRequestMap called');
+        requestMap = L.map('requestMap').setView([currentLocation.lat, currentLocation.lon], 15);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(requestMap);
+        
+        // Add location marker
+        locationMarker = L.marker([currentLocation.lat, currentLocation.lon], {
+            draggable: true
+        }).addTo(requestMap);
+        
+        locationMarker.bindPopup('Drag to adjust your location').openPopup();
+        
+        // Update location when marker is dragged
+        locationMarker.on('dragend', function(event) {
+            const marker = event.target;
+            const position = marker.getLatLng();
+            currentLocation.lat = position.lat;
+            currentLocation.lon = position.lng;
+            updateAddress(currentLocation.lat, currentLocation.lon);
+            loadNearbyProvidersPreview();
+        });
+        
+        // Get user's current location
+        locateUserForRequest();
+        
+        // Load nearby providers preview
+        loadNearbyProvidersPreview();
+    }
+    
+    // Locate user for request
+    function locateUserForRequest() {
+        console.log('locateUserForRequest called');
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentLocation.lat = position.coords.latitude;
+                    currentLocation.lon = position.coords.longitude;
+                    
+                    requestMap.setView([currentLocation.lat, currentLocation.lon], 15);
+                    locationMarker.setLatLng([currentLocation.lat, currentLocation.lon]);
+                    updateAddress(currentLocation.lat, currentLocation.lon);
+                    loadNearbyProvidersPreview();
+                },
+                function(error) {
+                    console.log('Geolocation error:', error);
+                    updateAddress(currentLocation.lat, currentLocation.lon);
+                }
+            );
+        }
+    }
+    
+    // Update address display
+    function updateAddress(lat, lon) {
+        console.log('updateAddress called with lat:', lat, 'lon:', lon);
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('Nominatim API response:', data);
+                const address = data.display_name || 'Location selected';
+                document.getElementById('currentAddressInput').value = address.split(',').slice(0, 3).join(',');
+                console.log('Current address set to:', address);
+            })
+            .catch(error => {
+                document.getElementById('currentAddressInput').value = 'Location selected';
+                console.error('Error updating address:', error);
+            });
+    }
+    
+    // Load nearby providers preview
+    function loadNearbyProvidersPreview() {
+        const serviceType = document.querySelector('input[name="service_type"]').value;
+        
+        fetch(`/maps/api/nearby-providers/?lat=${currentLocation.lat}&lon=${currentLocation.lon}&service_type=${serviceType}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayProvidersPreview(data.providers);
+                }
+            });
+    }
+    
+    // Display providers preview
+    function displayProvidersPreview(providers) {
+        const preview = document.getElementById('nearbyProvidersPreview');
+        
+        if (providers.length === 0) {
+            preview.innerHTML = `
+                <div class="text-center py-3">
+                    <i class="fas fa-search fa-2x text-muted mb-2"></i>
+                    <p class="text-muted mb-1">No providers available</p>
+                    <small class="text-muted">Try changing service type or location</small>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        providers.slice(0, 3).forEach(provider => {
+            html += `
+                <div class="d-flex align-items-center mb-2 p-2 border rounded">
+                    <div class="service-icon-small ${provider.service_type} me-2">
+                        <i class="fas ${getServiceIcon(provider.service_type)}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0 small">${provider.company_name}</h6>
+                        <small class="text-muted">${provider.distance}km • ${provider.eta} min</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-warning text-dark small">⭐ ${provider.rating}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        if (providers.length > 3) {
+            html += `<small class="text-muted">+${providers.length - 3} more providers available</small>`;
+        }
+        
+        preview.innerHTML = html;
+    }
+    
+    // Get service icon (reuse from main map)
+    function getServiceIcon(serviceType) {
+        const icons = {
+            'towing': 'fa-truck',
+            'mechanic': 'fa-tools',
+            'vulcanizing': 'fa-tire',
+            'parts': 'fa-cog',
+            'washing': 'fa-soap'
+        };
+        return icons[serviceType] || 'fa-store';
+    }
+    
+    // Form submission
+    document.getElementById('assistanceForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById('submitRequest');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Requesting...';
+        
+        const formData = new FormData(this);
+        formData.append('latitude', currentLocation.lat);
+        formData.append('longitude', currentLocation.lon);
+        
+        fetch('{% url "maps:request_assistance_map" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                const form = document.getElementById('assistanceForm');
+                form.innerHTML = `
+                    <div class="alert alert-success text-center">
+                        <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                        <h5>Help is on the way!</h5>
+                        p class="mb-3">Your assistance request has been submitted successfully.</p>
+                        <p class="small text-muted">Request ID: #${data.request_id}</p>
+                        <a href="{% url 'dashboard' %}" class="btn btn-primary">View Dashboard</a>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            alert('Error submitting request. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Request Assistance';
+        });
+    });
+    
+    // Update providers when service type changes
+    document.querySelectorAll('input[name="service_type"]').forEach(radio => {
+        radio.addEventListener('change', loadNearbyProvidersPreview);
+    });
+    
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', initRequestMap);
+</script>
+
+<style>
+    .service-icon-small {
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+    }
+    
+    .service-icon-small.towing { background: #ef4444; }
+    .service-icon-small.mechanic { background: #f59e0b; }
+    .service-icon-small.vulcanizing { background: #8b5cf6; }
+    .service-icon-small.parts { background: #06b6d4; }
+    
+    .btn-check:checked + .btn {
+        background: #1e3a8a;
+        border-color: #1e3a8a;
+        color: white;
+    }
+</style>
+{% endblock %}

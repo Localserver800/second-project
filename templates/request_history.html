@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}Request History - Roadside Rescue{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="h3 mb-2">Request History</h1>
+    <p class="text-muted">Here is a list of all your past and current assistance requests.</p>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Service</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for request in requests %}
+                        <tr>
+                            <td>{{ request.created_at|date:"M d, Y, h:i A" }}</td>
+                            <td>{{ request.get_service_type_display }}</td>
+                            <td><span class="status-badge status-{{ request.status }}">{{ request.get_status_display }}</span></td>
+                            <td>
+                                {% if request.status in 'pending,accepted,in_progress' %}
+                                <a href="{% url 'bookings:cancel_request' request.id %}" class="btn btn-danger btn-sm">Cancel</a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">No requests found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

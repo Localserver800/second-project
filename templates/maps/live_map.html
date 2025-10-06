@@ -1,0 +1,552 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Live Map - Roadside Rescue{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="row g-0">
+        <!-- Map Container -->
+        <div class="col-lg-8">
+            <div class="position-relative" style="height: 100vh;">
+                <!-- Map will be rendered here -->
+                <div id="map" style="height: 100vh; width: 100%;"></div>
+                
+                <!-- Map Controls -->
+                <div class="position-absolute top-0 end-0 m-3">
+                    <div class="btn-group-vertical shadow">
+                        <button id="locateMe" class="btn btn-light btn-lg">
+                            <i class="fas fa-crosshairs"></i>
+                        </button>
+                        <button id="zoomIn" class="btn btn-light btn-lg">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button id="zoomOut" class="btn btn-light btn-lg">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Service Type Filter -->
+                <div class="position-absolute top-0 start-0 m-3">
+                    <div class="card shadow-sm">
+                        <div class="card-body p-2">
+                            <select id="serviceFilter" class="form-select" multiple>
+                                {% for category in service_categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="h-100 bg-light p-3" style="overflow-y: auto;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="mb-0" style="color: #1e3a8a;">
+                        <i class="fas fa-map-marker-alt me-2"></i>Nearby Help
+                    </h4>
+                    <span class="badge bg-primary" id="providerCount">0 providers</span>
+                </div>
+                
+                <!-- User Location Card -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-primary rounded-circle p-2 me-3">
+                                <i class="fas fa-user text-white"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">Your Location</h6>
+                                <small class="text-muted" id="userAddress">Locating...</small>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted" id="lastUpdated">Just now</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Providers List -->
+                <div id="providersList">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Finding nearby providers...</p>
+                    </div>
+                </div>
+                
+                <!-- Request Assistance Button -->
+                <div class="position-sticky bottom-0 bg-light pt-3 border-top">
+                    <a href="{% url 'maps:request_assistance_map' %}" class="btn btn-primary w-100 btn-lg">
+                        <i class="fas fa-plus-circle me-2"></i>Request Assistance
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // Global variables
+    let map;
+    let userMarker;
+    let providerMarkers = [];
+    let userLocation = {
+        lat: {{ default_lat }},
+        lon: {{ default_lon }}
+    };
+    
+    // Initialize map
+    function initMap() {
+        // Create map
+        map = L.map('map').setView([userLocation.lat, userLocation.lon], 13);
+        
+        // Add OpenStreetMap tiles (free)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+        
+        // Add user marker
+        userMarker = L.marker([userLocation.lat, userLocation.lon])
+            .addTo(map)
+            .bindPopup('<b>Your Location</b><br>We are finding help near you.')
+            .openPopup();
+        
+        // Custom icon for user
+        userMarker.setIcon(L.divIcon({
+            className: 'user-marker',
+            html: '<div class="user-location-marker"><i class="fas fa-user"></i></div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        }));
+        
+        // Get user's actual location
+        locateUser();
+        
+        // Load nearby providers
+        loadNearbyProviders();
+    }
+    
+    // Get user's current location
+    function locateUser() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    userLocation.lat = position.coords.latitude;
+                    userLocation.lon = position.coords.longitude;
+                    
+                    // Update map view
+                    map.setView([userLocation.lat, userLocation.lon], 15);
+                    
+                    // Update user marker
+                    userMarker.setLatLng([userLocation.lat, userLocation.lon]);
+                    
+                    // Update address (reverse geocoding)
+                    updateAddress(userLocation.lat, userLocation.lon);
+                    
+                    // Reload providers
+                    loadNearbyProviders();
+                },
+                function(error) {
+                    console.log('Geolocation error:', error);
+                    // Use default location
+                    updateAddress(userLocation.lat, userLocation.lon);
+                }
+            );
+        }
+    }
+    
+    // Update address using reverse geocoding
+    function updateAddress(lat, lon) {
+        // Using Nominatim (free OpenStreetMap geocoding)
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(data => {
+                const address = data.display_name || 'Location found';
+                document.getElementById('userAddress').textContent = address.split(',').slice(0, 3).join(',');
+            })
+            .catch(error => {
+                document.getElementById('userAddress').textContent = 'Location found';
+            });
+    }
+    
+    // Load nearby providers
+    function loadNearbyProviders() {
+        const serviceSelect = document.getElementById('serviceFilter');
+        const selectedServices = Array.from(serviceSelect.options)
+                                    .filter(option => option.selected)
+                                    .map(option => option.value);
+        
+        let url = `/maps/api/nearby-providers/?lat=${userLocation.lat}&lon=${userLocation.lon}`;
+        selectedServices.forEach(service => {
+            url += `&service_type=${service}`;
+        });
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayProviders(data.providers);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading providers:', error);
+            });
+    }
+    
+    // Display providers on map and list
+    function displayProviders(providers) {
+        // Clear existing provider markers
+        providerMarkers.forEach(marker => map.removeLayer(marker));
+        providerMarkers = [];
+        
+        // Update provider count
+        document.getElementById('providerCount').textContent = `${providers.length} providers`;
+        
+        // Update providers list
+        const providersList = document.getElementById('providersList');
+        providersList.innerHTML = '';
+        
+        if (providers.length === 0) {
+            providersList.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-search fa-2x text-muted mb-3"></i>
+                    <p class="text-muted">No providers found in your area.</p>
+                    <small class="text-muted">Try changing service type or location.</small>
+                </div>
+            `;
+            return;
+        }
+        
+        providers.forEach((provider, index) => {
+            // Add marker to map
+            const providerIcon = L.divIcon({
+                className: 'provider-marker',
+                html: `<div class="provider-marker-icon" data-service="${provider.services[0]}">
+                          <i class="fas ${getServiceIcon(provider.services[0])}"></i>
+                       </div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            const marker = L.marker([provider.latitude, provider.longitude], { icon: providerIcon })
+                .addTo(map)
+                .bindPopup(`
+                    <div class="provider-popup">
+                        <h6>${provider.company_name}</h6>
+                        <p class="mb-1">${provider.services.join(', ')}</p>
+                        <p class="mb-1">⭐ ${provider.rating} • ${provider.distance}km away</p>
+                        <p class="mb-1"><strong>ETA:</strong> ${provider.eta} minutes</p>
+                        <button class="btn btn-primary btn-sm mt-2 w-100" onclick="selectProvider(${provider.id})">
+                            Select Provider
+                        </button>
+                    </div>
+                `);
+            
+            providerMarkers.push(marker);
+            
+            // Add to providers list
+            const providerCard = document.createElement('div');
+            providerCard.className = 'card mb-2 provider-card';
+            providerCard.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <div class="provider-avatar me-3">
+                            <div class="service-icon ${provider.services[0]}">
+                                <i class="fas ${getServiceIcon(provider.services[0])}"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${provider.company_name}</h6>
+                            <p class="text-muted mb-1 small">${provider.services.join(', ')}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-light text-dark">
+                                    <i class="fas fa-clock me-1"></i>${provider.eta} min
+                                </span>
+                                <span class="badge bg-light text-dark">
+                                    <i class="fas fa-road me-1"></i>${provider.distance} km
+                                </span>
+                                <span class="badge bg-warning text-dark">
+                                    ⭐ ${provider.rating}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-outline-primary btn-sm w-100" onclick="selectProvider(${provider.id})">
+                            <i class="fas fa-check me-1"></i>Select Provider
+                        </button>
+                    </div>
+                </div>
+            `;
+            providersList.appendChild(providerCard);
+        });
+    }
+    
+    // Get service icon
+    function getServiceIcon(serviceType) {
+        const icons = {
+            'Towing Service': 'fa-truck',
+            'Mechanical Workshop': 'fa-tools',
+            'Vulcanizing Shop': 'fa-tire',
+            'Vehicle Parts Shop': 'fa-cog',
+            'Washing Bay': 'fa-soap'
+        };
+        return icons[serviceType] || 'fa-store';
+    }
+    
+    // Get service name
+    function getServiceName(serviceType) {
+        const names = {
+            'Towing Service': 'Towing Service',
+            'Mechanical Workshop': 'Mechanical Workshop',
+            'Vulcanizing Shop': 'Vulcanizing Shop',
+            'Vehicle Parts Shop': 'Vehicle Parts Shop',
+            'Washing Bay': 'Washing Bay'
+        };
+        return names[serviceType] || 'Service Provider';
+    }
+    
+    // Select provider and start tracking
+    function selectProvider(providerId) {
+        // In a real app, this would create an assistance request
+        const selectedProvider = providers.find(p => p.id === providerId);
+        
+        if (selectedProvider) {
+            // Show confirmation modal
+            showBookingConfirmation(selectedProvider);
+        }
+    }
+
+    function showBookingConfirmation(provider) {
+        const modalHtml = `
+            <div class="modal fade" id="bookingModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirm Assistance Request</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="text-center mb-4">
+                                <div class="service-icon-large ${provider.services[0]} mx-auto mb-3">
+                                    <i class="fas ${getServiceIcon(provider.services[0])}"></i>
+                                </div>
+                                <h5>${provider.company_name}</h5>
+                                <p class="text-muted">${provider.services.join(', ')}</p>
+                            </div>
+                            
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <small class="text-muted d-block">ETA</small>
+                                        <strong>${provider.eta} min</strong>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <small class="text-muted d-block">Distance</small>
+                                        <strong>${provider.distance} km</strong>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <small class="text-muted d-block">Rating</small>
+                                        <strong>⭐ ${provider.rating}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <small>
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Your provider will be notified and you can track their arrival in real-time.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="confirmBooking(${provider.id})">
+                                <i class="fas fa-check me-1"></i>Confirm Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('bookingModal'));
+        modal.show();
+        
+        // Remove modal from DOM after hide
+        document.getElementById('bookingModal').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+        });
+    }
+
+    function confirmBooking(provider) {
+        const userLat = userLocation.lat;
+        const userLon = userLocation.lon;
+
+        // Get service type from the selected provider's services (assuming first one for simplicity)
+        const serviceType = provider.services[0]; 
+
+        fetch('{% url 'bookings:create_assistance_request_api' %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                provider_id: provider.id,
+                service_type: serviceType,
+                latitude: userLat,
+                longitude: userLon,
+                description: "Assistance requested via live map."
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('bookingModal')).hide();
+                // Redirect to tracking page with the actual tracking_id
+                window.location.href = `/maps/active-tracking/${data.tracking_id}/`;
+            } else {
+                alert('Error creating assistance request: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error creating assistance request:', error);
+            alert('An error occurred while creating your assistance request.');
+        });
+    }
+    
+    // Event listeners
+    document.getElementById('locateMe').addEventListener('click', locateUser);
+    document.getElementById('serviceFilter').addEventListener('change', loadNearbyProviders);
+    
+    // Map controls
+    document.getElementById('zoomIn').addEventListener('click', () => map.zoomIn());
+    document.getElementById('zoomOut').addEventListener('click', () => map.zoomOut());
+    
+    // Initialize map when page loads
+    document.addEventListener('DOMContentLoaded', initMap);
+</script>
+
+<style>
+    /* Custom marker styles */
+    .user-marker {
+        background: none;
+        border: none;
+    }
+    
+    .user-location-marker {
+        width: 30px;
+        height: 30px;
+        background: #1e40af;
+        border: 3px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    
+    .provider-marker {
+        background: none;
+        border: none;
+    }
+    
+    .provider-marker-icon {
+        width: 30px;
+        height: 30px;
+        background: #10b981;
+        border: 2px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .provider-marker-icon:hover {
+        transform: scale(1.2);
+        background: #059669;
+    }
+    
+    /* Service type specific colors */
+    .provider-marker-icon[data-service="towing"] { background: #ef4444; }
+    .provider-marker-icon[data-service="mechanic"] { background: #f59e0b; }
+    .provider-marker-icon[data-service="vulcanizing"] { background: #8b5cf6; }
+    .provider-marker-icon[data-service="parts"] { background: #06b6d4; }
+    .provider-marker-icon[data-service="washing"] { background: #10b981; }
+    
+    /* Provider card styles */
+    .provider-card {
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    
+    .provider-card:hover {
+        border-color: #1e40af;
+        transform: translateY(-2px);
+    }
+    
+    .service-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+    }
+    
+    .service-icon.towing { background: #ef4444; }
+    .service-icon.mechanic { background: #f59e0b; }
+    .service-icon.vulcanizing { background: #8b5cf6; }
+    .service-icon.parts { background: #06b6d4; }
+    .service-icon.washing { background: #10b981; }
+    
+    /* Popup styles */
+    .provider-popup {
+        min-width: 200px;
+    }
+    
+    .provider-popup h6 {
+        color: #1e3a8a;
+        margin-bottom: 8px;
+    }
+    
+    /* Map control buttons */
+    .btn-group-vertical .btn {
+        border-radius: 8px !important;
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}

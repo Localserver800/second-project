@@ -1,0 +1,326 @@
+{% extends 'base.html' %}
+
+{% block title %}Provider Dashboard - Roadside Rescue{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="h3 mb-2">Welcome, {{ user.serviceprovider.company_name }}! 🛠️</h1>
+            <p class="text-muted">Manage your services and help drivers in need.</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <button class="btn btn-success me-2">
+                    <i class="fas fa-toggle-on me-2"></i>Online
+                </button>
+                <button class="btn btn-outline-primary">
+                    <i class="fas fa-bell me-2"></i>Notifications
+                    <span class="notification-badge">{{ pending_jobs_count|default:"0" }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Overview -->
+<div class="row">
+    <div class="col-xl-3 col-md-6">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-8">
+                        <h6 class="text-muted mb-0">Total Jobs</h6>
+                        <h3 class="mt-2 fw-bold">{{ total_jobs|default:"0" }}</h3>
+                    </div>
+                    <div class="col-4 text-end">
+                        <i class="fas fa-briefcase fa-2x text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card stat-card success">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-8">
+                        <h6 class="text-muted mb-0">Completed</h6>
+                        <h3 class="mt-2 fw-bold">{{ completed_jobs|default:"0" }}</h3>
+                    </div>
+                    <div class="col-4 text-end">
+                        <i class="fas fa-check-circle fa-2x text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card stat-card warning">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-8">
+                        <h6 class="text-muted mb-0">Pending</h6>
+                        <h3 class="mt-2 fw-bold">{{ pending_jobs_count|default:"0" }}</h3>
+                    </div>
+                    <div class="col-4 text-end">
+                        <i class="fas fa-clock fa-2x text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-8">
+                        <h6 class="text-muted mb-0">Rating</h6>
+                        <h3 class="mt-2 fw-bold">{{ rating|default:"0.0" }}</h3>
+                    </div>
+                    <div class="col-4 text-end">
+                        <i class="fas fa-star fa-2x text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Quick Actions & Business Info -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-white border-0">
+                <h5 class="card-title mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="quick-action">
+                            <i class="fas fa-list"></i>
+                            <h6>View Jobs</h6>
+                            <small class="text-muted">Active requests</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="quick-action">
+                            <i class="fas fa-chart-line"></i>
+                            <h6>Analytics</h6>
+                            <small class="text-muted">Performance</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <a href="{% url 'users:profile_settings' %}" class="text-decoration-none text-dark">
+                            <div class="quick-action">
+                                <i class="fas fa-user-cog"></i>
+                                <h6>Settings</h6>
+                                <small class="text-muted">Manage profile</small>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <div class="quick-action">
+                            <i class="fas fa-wallet"></i>
+                            <h6>Earnings</h6>
+                            <small class="text-muted">View income</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Business Information -->
+        <div class="card mt-4">
+            <div class="card-header bg-white border-0">
+                <h5 class="card-title mb-0">Business Overview</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-store fa-2x text-primary me-3"></i>
+                    <div>
+                        <h6 class="mb-0">{{ user.serviceprovider.company_name }}</h6>
+                        <small class="text-muted">Business Name</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-tools fa-2x text-success me-3"></i>
+                    <div>
+                        <h6 class="mb-0">
+                            {% for service in user.serviceprovider.services.all %}
+                                {{ service.name }}{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                No services offered
+                            {% endfor %}
+                        </h6>
+                        <small class="text-muted">Services Offered</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-map-marker-alt fa-2x text-warning me-3"></i>
+                    <div>
+                        <h6 class="mb-0">{{ user.serviceprovider.address }}</h6>
+                        <small class="text-muted">Location</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-phone fa-2x text-info me-3"></i>
+                    <div>
+                        <h6 class="mb-0">{{ user.serviceprovider.phone }}</h6>
+                        <small class="text-muted">Contact</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Jobs & Recent Activity -->
+    <div class="col-lg-8">
+        <!-- New Service Requests -->
+        <div class="card">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">New Service Requests</h5>
+                <span class="badge bg-primary">{{ pending_jobs_count|default:"0" }} New</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for request in new_requests %}
+                    <div class="col-12">
+                        <div class="p-3 border rounded">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h6 class="mb-1">{{ request.get_service_type_display }} Needed</h6>
+                                    <p class="text-muted mb-1">📍 {{ request.latitude }}, {{ request.longitude }}</p>
+                                    <small class="text-muted">Requested {{ request.created_at|timesince }} ago</small>
+                                </div>
+                                <span class="status-badge status-pending">Pending</span>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-6">
+                                    <small><strong>Vehicle:</strong> {{ request.driver.vehicle_type }}</small><br>
+                                    <small><strong>Issue:</strong> {{ request.description }}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <small><strong>Estimated Pay:</strong> ₵{{ request.estimated_price|default:"N/A" }}</small>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <a href="{% url 'bookings:accept_request' request.id %}" class="btn btn-success btn-sm me-2">
+                                    <i class="fas fa-check me-1"></i>Accept
+                                </a>
+                                <button class="btn btn-outline-danger btn-sm">
+                                    <i class="fas fa-times me-1"></i>Decline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center">
+                        <p class="text-muted">No new service requests at the moment.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Jobs -->
+        <div class="card mt-4">
+            <div class="card-header bg-white border-0">
+                <h5 class="card-title mb-0">Active Jobs</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Service</th>
+                                <th>Location</th>
+                                <th>Started</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for job in active_jobs %}
+                            <tr>
+                                <td>{{ job.driver.user.username }}</td>
+                                <td>{{ job.get_service_type_display }}</td>
+                                <td>{{ job.latitude }}, {{ job.longitude }}</td>
+                                <td>{{ job.created_at|timesince }} ago</td>
+                                <td><span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span></td>
+                                <td>
+                                    {% if job.status == 'accepted' %}
+                                    <a href="{% url 'bookings:start_service' job.id %}" class="btn btn-primary btn-sm">Start Service</a>
+                                    {% elif job.status == 'in_progress' %}
+                                    <a href="{% url 'bookings:complete_service' job.id %}" class="btn btn-success btn-sm">Complete Service</a>
+                                    <a href="{% url 'maps:simulate_movement' job.tracking_id %}" class="btn btn-info btn-sm">Send Location</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center">No active jobs.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Chart -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white border-0">
+                <h5 class="card-title mb-0">Weekly Performance</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="performanceChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Performance Chart
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const performanceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Completed Jobs',
+                data: [5, 7, 8, 6, 9, 4, 3], // This data is still static
+                backgroundColor: '#4361ee',
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        drawBorder: false
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="hero-section text-center">
+    <div class="container">
+        <h1 class="display-4 fw-bold">Roadside Rescue Ghana</h1>
+        <p class="lead">Get immediate help when your vehicle breaks down anywhere in Ghana</p>
+        {% if not user.is_authenticated %}
+            <a href="{% url 'register' %}" class="btn btn-primary btn-lg me-2">Get Started</a>
+            <a href="{% url 'login' %}" class="btn btn-outline-light btn-lg">Login</a>
+        {% else %}
+            <a href="{% url 'request_assistance' %}" class="btn btn-warning btn-lg">Request Assistance</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row text-center mb-5">
+        <div class="col">
+            <h2>Our Services</h2>
+            <p class="lead">Comprehensive roadside assistance tailored for Ghanaian drivers</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card service-card h-100">
+                <div class="card-body text-center">
+                    <h3>🚛 Towing Services</h3>
+                    <p>Reliable towing to the nearest garage with transparent pricing</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card service-card h-100">
+                <div class="card-body text-center">
+                    <h3>🔧 Mechanical Help</h3>
+                    <p>Certified mechanics for on-spot repairs and garage services</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card service-card h-100">
+                <div class="card-body text-center">
+                    <h3>🛞 Vulcanizing</h3>
+                    <p>Quick tire repairs and replacements when you need them most</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-2">
+        <div class="col-md-4">
+            <div class="card service-card h-100">
+                <div class="card-body text-center">
+                    <h3>🔩 Parts Shops</h3>
+                    <p>Find genuine vehicle parts from trusted suppliers nearby</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card service-card h-100">
+                <div class="card-body text-center">
+                    <h3>💧 Washing Bays</h3>
+                    <p>Locate nearby washing bays for vehicle cleaning services</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card service-card h-100">
+                <div class="card-body text-center">
+                    <h3>⭐ Verified Providers</h3>
+                    <p>All service providers are verified and rated by users</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-light py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
+                <h3>How It Works</h3>
+                <div class="mt-4">
+                    <h5>1. Request Assistance</h5>
+                    <p>Open the app and request help with your current location</p>
+                    
+                    <h5>2. Get Matched</h5>
+                    <p>We find the nearest verified service provider for you</p>
+                    
+                    <h5>3. Track in Real-time</h5>
+                    <p>See your help arriving with real-time tracking</p>
+                    
+                    <h5>4. Pay Securely</h5>
+                    <p>Transparent pricing with secure payment options</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h3>Why Choose Us?</h3>
+                <ul class="list-unstyled">
+                    <li class="mb-2">✅ Verified service providers</li>
+                    <li class="mb-2">✅ Transparent pricing</li>
+                    <li class="mb-2">✅ Real-time tracking</li>
+                    <li class="mb-2">✅ 24/7 availability</li>
+                    <li class="mb-2">✅ User ratings and reviews</li>
+                    <li class="mb-2">✅ Coverage across Ghana</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Request Assistance - Roadside Rescue{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="row g-0">
+        <!-- Map Container -->
+        <div class="col-lg-8">
+            <div class="position-relative" style="height: 100vh;">
+                <div id="map" style="height: 100vh; width: 100%;"></div>
+                
+                <!-- Location selection marker -->
+                <div class="position-absolute top-50 start-50 translate-middle" style="z-index: 1000;">
+                    <i class="fas fa-map-marker-alt fa-3x text-danger"></i>
+                </div>
+                
+                <!-- Map Controls -->
+                <div class="position-absolute top-0 end-0 m-3">
+                    <div class="btn-group-vertical shadow">
+                        <button id="locateMe" class="btn btn-light btn-lg">
+                            <i class="fas fa-crosshairs"></i>
+                        </button>
+                        <button id="zoomIn" class="btn btn-light btn-lg">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button id="zoomOut" class="btn btn-light btn-lg">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Request Form Sidebar -->
+        <div class="col-lg-4">
+            <div class="h-100 bg-light p-3" style="overflow-y: auto;">
+                <h4 class="mb-4" style="color: #1e3a8a;">
+                    <i class="fas fa-car-crash me-2"></i>Request Assistance
+                </h4>
+                
+                <form id="assistanceRequestForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="serviceType" class="form-label">Service Needed</label>
+                        <select class="form-select" id="serviceType" name="service_type" required>
+                            <option value="">Select a service</option>
+                            {% for category in service_categories %}
+                            <option value="{{ category.name }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description of Issue</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="e.g., Flat tire, engine overheating, out of fuel" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="locationAddress" class="form-label">Selected Location</label>
+                        <input type="text" class="form-control" id="locationAddress" readonly>
+                        <input type="hidden" id="latitude" name="latitude">
+                        <input type="hidden" id="longitude" name="longitude">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 btn-lg">
+                        <i class="fas fa-paper-plane me-2"></i>Submit Request
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    let map;
+    let userLocation = {
+        lat: {{ default_lat }},
+        lon: {{ default_lon }}
+    };
+    let selectedLocationMarker;
+
+    function initMap() {
+        map = L.map('map').setView([userLocation.lat, userLocation.lon], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        // Initial marker at the center of the map
+        selectedLocationMarker = L.marker([userLocation.lat, userLocation.lon], { draggable: true }).addTo(map);
+        updateLocationInputs(userLocation.lat, userLocation.lon);
+
+        // Update marker position when map is moved
+        map.on('move', function() {
+            const center = map.getCenter();
+            selectedLocationMarker.setLatLng(center);
+            updateLocationInputs(center.lat, center.lng);
+        });
+
+        // Update marker position when dragged
+        selectedLocationMarker.on('dragend', function(event) {
+            const marker = event.target;
+            const position = marker.getLatLng();
+            updateLocationInputs(position.lat, position.lng);
+            map.setView(position, map.getZoom());
+        });
+
+        locateUser();
+    }
+
+    function locateUser() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    userLocation.lat = position.coords.latitude;
+                    userLocation.lon = position.coords.longitude;
+                    map.setView([userLocation.lat, userLocation.lon], 15);
+                    selectedLocationMarker.setLatLng([userLocation.lat, userLocation.lon]);
+                    updateLocationInputs(userLocation.lat, userLocation.lon);
+                },
+                function(error) {
+                    console.log('Geolocation error:', error);
+                    updateLocationInputs(userLocation.lat, userLocation.lon);
+                }
+            );
+        }
+    }
+
+    function updateLocationInputs(lat, lon) {
+        document.getElementById('latitude').value = lat;
+        document.getElementById('longitude').value = lon;
+        
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(data => {
+                const address = data.display_name || 'Unknown Location';
+                document.getElementById('locationAddress').value = address.split(',').slice(0, 3).join(',');
+            })
+            .catch(error => {
+                document.getElementById('locationAddress').value = 'Unknown Location';
+            });
+    }
+
+    document.getElementById('locateMe').addEventListener('click', locateUser);
+    document.getElementById('zoomIn').addEventListener('click', () => map.zoomIn());
+    document.getElementById('zoomOut').addEventListener('click', () => map.zoomOut());
+
+    document.getElementById('assistanceRequestForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+
+        fetch('{% url 'maps:request_assistance_map' %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert(result.message);
+                // Redirect to active tracking or dashboard
+                window.location.href = `/maps/active-tracking/${result.request_id}/`;
+            } else {
+                alert('Error: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error submitting request:', error);
+            alert('An error occurred while submitting your request.');
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', initMap);
+</script>
+
+<style>
+    /* Custom marker styles */
+    .user-marker {
+        background: none;
+        border: none;
+    }
+    
+    .user-location-marker {
+        width: 30px;
+        height: 30px;
+        background: #1e40af;
+        border: 3px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    
+    .provider-marker {
+        background: none;
+        border: none;
+    }
+    
+    .provider-marker-icon {
+        width: 30px;
+        height: 30px;
+        background: #10b981;
+        border: 2px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .provider-marker-icon:hover {
+        transform: scale(1.2);
+        background: #059669;
+    }
+    
+    /* Service type specific colors */
+    .provider-marker-icon[data-service="towing"] { background: #ef4444; }
+    .provider-marker-icon[data-service="mechanic"] { background: #f59e0b; }
+    .provider-marker-icon[data-service="vulcanizing"] { background: #8b5cf6; }
+    .provider-marker-icon[data-service="parts"] { background: #06b6d4; }
+    .provider-marker-icon[data-service="washing"] { background: #10b981; }
+    
+    /* Provider card styles */
+    .provider-card {
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    
+    .provider-card:hover {
+        border-color: #1e40af;
+        transform: translateY(-2px);
+    }
+    
+    .service-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+    }
+    
+    .service-icon.towing { background: #ef4444; }
+    .service-icon.mechanic { background: #f59e0b; }
+    .service-icon.vulcanizing { background: #8b5cf6; }
+    .service-icon.parts { background: #06b6d4; }
+    .service-icon.washing { background: #10b981; }
+    
+    /* Popup styles */
+    .provider-popup {
+        min-width: 200px;
+    }
+    
+    .provider-popup h6 {
+        color: #1e3a1a;
+        margin-bottom: 8px;
+    }
+    
+    /* Map control buttons */
+    .btn-group-vertical .btn {
+        border-radius: 8px !important;
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}

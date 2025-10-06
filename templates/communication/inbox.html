@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block title %}Inbox - Roadside Rescue{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="h3 mb-2">Inbox</h1>
+    <div class="list-group">
+        {% for message in messages %}
+        <a href="#" class="list-group-item list-group-item-action flex-column align-items-start {% if not message.is_read %}list-group-item-primary{% endif %}">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{ message.subject }}</h5>
+                <small>{{ message.created_at|timesince }} ago</small>
+            </div>
+            <p class="mb-1">From: {{ message.sender.username }}</p>
+            <small>{{ message.body|truncatewords:20 }}</small>
+        </a>
+        {% empty %}
+        <p>No messages in your inbox.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
