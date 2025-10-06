@@ -1,0 +1,13 @@
+
+{% extends "users/settings.html" %}
+
+{% block settings_content %}
+<h3>Account Information</h3>
+<p>Update your account's public profile and email address.</p>
+<hr>
+<form method="post">
+    {% csrf_token %}
+    {{ user_form.as_p }}
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+</form>
+{% endblock %}

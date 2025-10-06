@@ -1,0 +1,48 @@
+
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h2">Settings</h1>
+            <p class="lead">Manage your account and preferences</p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{% url 'users:settings' %}">
+                            <i class="fas fa-user-cog me-2"></i>Account
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'users:settings_security' %}">
+                            <i class="fas fa-shield-alt me-2"></i>Security
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'users:settings_payment' %}">
+                            <i class="fas fa-credit-card me-2"></i>Payment
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-body">
+                {% block settings_content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
