@@ -2,16 +2,16 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.views import View
 from .forms import CustomUserCreationForm, ServiceProviderServiceForm, UserUpdateForm, DriverUpdateForm, ServiceProviderUpdateForm, CustomPasswordChangeForm
 from .models import ServiceProvider, Driver
 from bookings.models import AssistanceRequest
 
-class ServiceProviderServiceView(View):
+class ServiceProviderServiceView(LoginRequiredMixin, View):
     template_name = 'users/service_provider_services.html'
 
-    @login_required
     def get(self, request):
         try:
             service_provider = request.user.serviceprovider
@@ -21,7 +21,6 @@ class ServiceProviderServiceView(View):
         form = ServiceProviderServiceForm(instance=service_provider)
         return render(request, self.template_name, {'form': form})
 
-    @login_required
     def post(self, request):
         try:
             service_provider = request.user.serviceprovider
@@ -34,16 +33,14 @@ class ServiceProviderServiceView(View):
             return redirect('dashboard_provider')
         return render(request, self.template_name, {'form': form})
 
-class AccountSettingsView(View):
+class AccountSettingsView(LoginRequiredMixin, View):
     template_name = 'users/settings_account.html'
 
-    @login_required
     def get(self, request):
         user_form = UserUpdateForm(instance=request.user)
         context = {'user_form': user_form}
         return render(request, self.template_name, context)
 
-    @login_required
     def post(self, request):
         user_form = UserUpdateForm(request.POST, instance=request.user)
         if user_form.is_valid():
@@ -53,16 +50,14 @@ class AccountSettingsView(View):
         context = {'user_form': user_form}
         return render(request, self.template_name, context)
 
-class SecuritySettingsView(View):
+class SecuritySettingsView(LoginRequiredMixin, View):
     template_name = 'users/settings_security.html'
 
-    @login_required
     def get(self, request):
         password_form = CustomPasswordChangeForm(user=request.user)
         context = {'password_form': password_form}
         return render(request, self.template_name, context)
 
-    @login_required
     def post(self, request):
         password_form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if password_form.is_valid():
@@ -73,10 +68,9 @@ class SecuritySettingsView(View):
         context = {'password_form': password_form}
         return render(request, self.template_name, context)
 
-class PaymentSettingsView(View):
+class PaymentSettingsView(LoginRequiredMixin, View):
     template_name = 'users/settings_payment.html'
 
-    @login_required
     def get(self, request):
         return render(request, self.template_name)
 
